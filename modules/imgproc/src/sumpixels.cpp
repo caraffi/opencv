@@ -105,30 +105,24 @@ struct Integral_SIMD<uchar, int, double>
                 __m128i vsuml = _mm_loadu_si128((const __m128i *)(prev_sum_row + j));
                 __m128i vsumh = _mm_loadu_si128((const __m128i *)(prev_sum_row + j + 4));
 
-                __m128i el8shr0 = _mm_loadl_epi64((const __m128i *)(src_row + j));
-                __m128i el8shr1 = _mm_slli_si128(el8shr0, 1);
-                __m128i el8shr2 = _mm_slli_si128(el8shr0, 2);
-                __m128i el8shr3 = _mm_slli_si128(el8shr0, 3);
+                __m128i vcurr = _mm_loadl_epi64((const __m128i *)(src_row + j));
+
+                vcurr = _mm_unpacklo_epi8(vcurr, v_zero);
+                vcurr = _mm_add_epi16(vcurr, _mm_slli_si128(vcurr,2) );
+                vcurr = _mm_add_epi16(vcurr, _mm_slli_si128(vcurr,4) );
+                vcurr = _mm_add_epi16(vcurr, _mm_slli_si128(vcurr,8) );
 
                 vsuml = _mm_add_epi32(vsuml, prev);
                 vsumh = _mm_add_epi32(vsumh, prev);
 
-                __m128i el8shr12 = _mm_add_epi16(_mm_unpacklo_epi8(el8shr1, v_zero),
-                                                 _mm_unpacklo_epi8(el8shr2, v_zero));
-                __m128i el8shr03 = _mm_add_epi16(_mm_unpacklo_epi8(el8shr0, v_zero),
-                                                 _mm_unpacklo_epi8(el8shr3, v_zero));
-                __m128i el8 = _mm_add_epi16(el8shr12, el8shr03);
-
-                __m128i el4h = _mm_add_epi16(_mm_unpackhi_epi16(el8, v_zero),
-                                             _mm_unpacklo_epi16(el8, v_zero));
-
-                vsuml = _mm_add_epi32(vsuml, _mm_unpacklo_epi16(el8, v_zero));
-                vsumh = _mm_add_epi32(vsumh, el4h);
+                vsuml = _mm_add_epi32(vsuml, _mm_unpacklo_epi16(vcurr, v_zero));
+                const __m128i vcurrh = _mm_unpackhi_epi16(vcurr, v_zero);
+                vsumh = _mm_add_epi32(vsumh, vcurrh);
 
                 _mm_storeu_si128((__m128i *)(sum_row + j), vsuml);
                 _mm_storeu_si128((__m128i *)(sum_row + j + 4), vsumh);
 
-                prev = _mm_add_epi32(prev, _mm_shuffle_epi32(el4h, _MM_SHUFFLE(3, 3, 3, 3)));
+                prev = _mm_add_epi32(prev, _mm_shuffle_epi32(vcurrh, _MM_SHUFFLE(3, 3, 3, 3)));
             }
 
             for (int v = sum_row[j - 1] - prev_sum_row[j - 1]; j < size.width; ++j)
