@@ -100,29 +100,54 @@ struct Integral_SIMD<uchar, int, double>
             prev = v_zero;
             j = 0;
 
-            for ( ; j + 7 < size.width; j += 8)
+            for ( ; j + 15 < size.width; j += 16)
             {
-                __m128i vsuml = _mm_loadu_si128((const __m128i *)(prev_sum_row + j));
-                __m128i vsumh = _mm_loadu_si128((const __m128i *)(prev_sum_row + j + 4));
+                __m128i vsumll = _mm_loadu_si128((const __m128i *)(prev_sum_row + j));
+                __m128i vsumhl = _mm_loadu_si128((const __m128i *)(prev_sum_row + j + 4));
+                __m128i vsumlh = _mm_loadu_si128((const __m128i *)(prev_sum_row + j + 8));
+                __m128i vsumhh = _mm_loadu_si128((const __m128i *)(prev_sum_row + j + 12));
 
-                __m128i vcurr = _mm_loadl_epi64((const __m128i *)(src_row + j));
+                __m128i vcurr = _mm_loadu_si128((const __m128i *)(src_row + j));
 
-                vcurr = _mm_unpacklo_epi8(vcurr, v_zero);
-                vcurr = _mm_add_epi16(vcurr, _mm_slli_si128(vcurr,2) );
-                vcurr = _mm_add_epi16(vcurr, _mm_slli_si128(vcurr,4) );
-                vcurr = _mm_add_epi16(vcurr, _mm_slli_si128(vcurr,8) );
+                __m128i vcurrl = _mm_unpacklo_epi8(vcurr, v_zero);
+                __m128i vcurrh = _mm_unpackhi_epi8(vcurr, v_zero);
+                __m128i shiftl = _mm_slli_si128(vcurrl,2);
+                __m128i shifth = _mm_slli_si128(vcurrh,2);
+                vcurrl = _mm_add_epi16(vcurrl, shiftl);
+                vcurrh = _mm_add_epi16(vcurrh, shifth);
+                shiftl = _mm_slli_si128(vcurrl,4);
+                shifth = _mm_slli_si128(vcurrh,4);
+                vcurrl = _mm_add_epi16(vcurrl, shiftl);
+                vcurrh = _mm_add_epi16(vcurrh, shifth);
+                shiftl = _mm_slli_si128(vcurrl,8);
+                shifth = _mm_slli_si128(vcurrh,8);
+                vcurrl = _mm_add_epi16(vcurrl, shiftl);
+                vcurrh = _mm_add_epi16(vcurrh, shifth);
 
-                vsuml = _mm_add_epi32(vsuml, prev);
-                vsumh = _mm_add_epi32(vsumh, prev);
+                vsumll = _mm_add_epi32(vsumll, prev);
+                vsumhl = _mm_add_epi32(vsumhl, prev);
 
-                vsuml = _mm_add_epi32(vsuml, _mm_unpacklo_epi16(vcurr, v_zero));
-                const __m128i vcurrh = _mm_unpackhi_epi16(vcurr, v_zero);
-                vsumh = _mm_add_epi32(vsumh, vcurrh);
+                vsumll = _mm_add_epi32(vsumll, _mm_unpacklo_epi16(vcurrl, v_zero));
+                const __m128i vcurrlh = _mm_unpackhi_epi16(vcurrl, v_zero);
+                vsumhl = _mm_add_epi32(vsumhl, vcurrlh);
 
-                _mm_storeu_si128((__m128i *)(sum_row + j), vsuml);
-                _mm_storeu_si128((__m128i *)(sum_row + j + 4), vsumh);
+                _mm_storeu_si128((__m128i *)(sum_row + j), vsumll);
+                _mm_storeu_si128((__m128i *)(sum_row + j + 4), vsumhl);
 
-                prev = _mm_add_epi32(prev, _mm_shuffle_epi32(vcurrh, _MM_SHUFFLE(3, 3, 3, 3)));
+                prev = _mm_add_epi32(prev, _mm_shuffle_epi32(vcurrlh, _MM_SHUFFLE(3, 3, 3, 3)));
+
+                vsumlh = _mm_add_epi32(vsumlh, prev);
+                vsumhh = _mm_add_epi32(vsumhh, prev);
+
+                vsumlh = _mm_add_epi32(vsumlh, _mm_unpacklo_epi16(vcurrh, v_zero));
+                const __m128i vcurrhh = _mm_unpackhi_epi16(vcurrh, v_zero);
+                vsumhh = _mm_add_epi32(vsumhh, vcurrhh);
+
+                _mm_storeu_si128((__m128i *)(sum_row + j + 8), vsumlh);
+                _mm_storeu_si128((__m128i *)(sum_row + j + 12), vsumhh);
+
+                prev = _mm_add_epi32(prev, _mm_shuffle_epi32(vcurrhh, _MM_SHUFFLE(3, 3, 3, 3)));
+
             }
 
             for (int v = sum_row[j - 1] - prev_sum_row[j - 1]; j < size.width; ++j)
